@@ -1,0 +1,29 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background-primary);
+}
+
+.layout-content {
+  display: flex;
+  flex: 1;
+  margin-top: var(--header-height);
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  margin-left: var(--sidebar-width);
+  min-height: calc(100vh - var(--header-height));
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+  }
+}

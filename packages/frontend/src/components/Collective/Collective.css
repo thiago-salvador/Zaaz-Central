@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css?family=Cardo:400i|Rubik:400,700&display=swap');
+
+:root {
+  --background-secondary: #1a1a1a;
+  --text-primary: #ffffff;
+  --card-background: #2a2a2a;
+  --shadow-color: rgba(0,0,0,0.1);
+  --gradient-overlay: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.9) 100%);
+}
+
+.collective-section {
+  padding: 20px;
+  width: 100%;
+}
+
+.collective-section h1 {
+  font-family: 'Lexend', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  padding: 0;
+  line-height: 1.2;
+}
+
+.page-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Rubik', sans-serif;
+}
+
+@media (min-width: 600px) {
+  .page-content {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .page-content {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.collective-container {
+  width: 100%;
+}
+
+.collective-card {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 1rem;
+  width: 100%;
+  height: 350px;
+  text-align: center;
+  color: var(--text-primary);
+  background-color: var(--card-background);
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px;
+  box-shadow: 0 1px 1px var(--shadow-color), 
+    0 2px 2px var(--shadow-color), 
+    0 4px 4px var(--shadow-color), 
+    0 8px 8px var(--shadow-color),
+    0 16px 16px var(--shadow-color);
+  transition: transform 0.3s ease;
+}
+
+.collective-card:hover {
+  transform: translateY(-5px);
+}
+
+.collective-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient-overlay);
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 1rem;
+  z-index: 1;
+  transform: translateY(70%);
+  transition: transform 0.3s ease;
+}
+
+.collective-card:hover .content {
+  transform: translateY(0);
+}
+
+.title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.copy {
+  font-family: 'Cardo', serif;
+  font-size: 1.125rem;
+  font-style: italic;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.collective-card:hover .copy {
+  opacity: 1;
+}
+
+.btn {
+  cursor: pointer;
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.65rem;
+  font-weight: bold;
+  letter-spacing: 0.025rem;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background-color: #8884d8;
+  border: none;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.2s ease;
+}
+
+.collective-card:hover .btn {
+  opacity: 1;
+}
+
+.btn:hover {
+  background-color: #7673c0;
+}
+
+.btn:focus {
+  outline: 1px dashed var(--text-primary);
+  outline-offset: 3px;
+}
