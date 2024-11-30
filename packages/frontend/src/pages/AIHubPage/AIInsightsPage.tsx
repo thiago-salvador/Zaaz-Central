@@ -35,6 +35,7 @@ import {
   FiArrowUp,
   FiArrowDown,
 } from 'react-icons/fi';
+import { chatService } from '../../services/chatService';
 
 // Mock data for insights
 const mockInsights = {
@@ -49,80 +50,69 @@ const mockInsights = {
       category: 'Market Trends',
       date: '2024-03-15',
     },
+    // Add more market trend insights
+  ],
+  customerBehavior: [
     {
       id: 2,
-      title: 'Emerging Technology Adoption',
-      description: 'Increased adoption of AI tools in target market',
+      title: 'Customer Retention Pattern',
+      description: 'Identified key factors driving customer loyalty',
       impact: 'Medium',
       confidence: 78,
       trend: 'up',
-      category: 'Market Trends',
+      category: 'Customer Behavior',
       date: '2024-03-14',
     },
+    // Add more customer behavior insights
   ],
-  competitorAnalysis: [
+  competitiveAnalysis: [
     {
       id: 3,
-      title: 'Competitor Market Share',
-      description: 'Main competitor showing 5% decrease in market share',
+      title: 'Competitor Strategy Shift',
+      description: 'Major competitor focusing on digital transformation',
       impact: 'High',
       confidence: 92,
       trend: 'down',
-      category: 'Competitor Analysis',
-      date: '2024-03-15',
-    },
-    {
-      id: 4,
-      title: 'Product Feature Gap',
-      description: 'Opportunity to differentiate through AI capabilities',
-      impact: 'Medium',
-      confidence: 88,
-      trend: 'up',
-      category: 'Competitor Analysis',
+      category: 'Competitive Analysis',
       date: '2024-03-13',
     },
-  ],
-  opportunities: [
-    {
-      id: 5,
-      title: 'New Market Entry',
-      description: 'Potential for 20% revenue increase through expansion',
-      impact: 'High',
-      confidence: 82,
-      trend: 'up',
-      category: 'Opportunities',
-      date: '2024-03-15',
-    },
-    {
-      id: 6,
-      title: 'Product Enhancement',
-      description: 'Adding AI features could increase user engagement by 25%',
-      impact: 'High',
-      confidence: 90,
-      trend: 'up',
-      category: 'Opportunities',
-      date: '2024-03-12',
-    },
+    // Add more competitive analysis insights
   ],
 };
 
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
+}
+
 const AIInsightsPage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState(0);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
+  const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedInsight, setSelectedInsight] = useState<any>(null);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: 'Hello! I am your AI assistant. How can I help you today?',
+      sender: 'ai',
+      timestamp: new Date(),
+    }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setSelectedTab(newValue);
   };
 
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
-    setFilterAnchorEl(event.currentTarget);
+    setFilterAnchor(event.currentTarget);
   };
 
   const handleFilterClose = () => {
-    setFilterAnchorEl(null);
+    setFilterAnchor(null);
   };
 
   const handleInsightClick = (insight: any) => {
@@ -134,138 +124,195 @@ const AIInsightsPage: React.FC = () => {
       case 0:
         return mockInsights.marketTrends;
       case 1:
-        return mockInsights.competitorAnalysis;
+        return mockInsights.customerBehavior;
       case 2:
-        return mockInsights.opportunities;
+        return mockInsights.competitiveAnalysis;
       default:
         return [];
     }
   };
 
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    try {
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        text: inputMessage,
+        sender: 'user',
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      const currentMessage = inputMessage;
+      setInputMessage('');
+      setIsLoading(true);
+
+      const response = await chatService.sendMessage(currentMessage);
+      console.log('Response from Langflow:', response);
+
+      if (response && response.message) {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: response.message,
+          sender: 'ai',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error: any) {
+      console.error('Error in handleSendMessage:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `Error: ${error.message || 'There was an error processing your request. Please try again.'}`,
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'var(--background-primary)', pt: 3, pb: 6 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: (theme) => theme.palette.background.default, pt: 3, pb: 6 }}>
       <Container maxWidth="xl">
         {/* Header Section */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--text-primary)', mb: 2 }}>
-            AI Insights Hub
+          <Typography variant="h4" sx={{ fontWeight: 700, color: (theme) => theme.palette.text.primary, mb: 2 }}>
+            AI Insights
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-            <TextField
-              placeholder="Search insights..."
-              size="small"
-              fullWidth
-              sx={{ maxWidth: 400 }}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <FiSearch />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <IconButton onClick={handleFilterClick}>
-              <FiFilter />
-            </IconButton>
-            <Button
-              variant="contained"
-              startIcon={<FiMessageSquare />}
-              onClick={() => setChatOpen(true)}
-            >
-              Ask AI
-            </Button>
-          </Box>
+          <Typography variant="body1" sx={{ color: (theme) => theme.palette.text.secondary }}>
+            AI-powered analysis and insights to help you make better business decisions
+          </Typography>
+        </Box>
 
-          {/* Tabs */}
-          <Tabs value={selectedTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tab label="Market Trends" icon={<FiTrendingUp />} iconPosition="start" />
-            <Tab label="Competitor Analysis" icon={<FiTarget />} iconPosition="start" />
-            <Tab label="Opportunities" icon={<FiUsers />} iconPosition="start" />
+        {/* Search and Filter Section */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+          <TextField
+            placeholder="Search insights..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              flex: 1,
+              maxWidth: 400,
+              '& .MuiOutlinedInput-root': {
+                bgcolor: (theme) => theme.palette.background.paper,
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <FiSearch />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Button
+            variant="outlined"
+            startIcon={<FiFilter />}
+            onClick={handleFilterClick}
+            sx={{
+              borderColor: (theme) => theme.palette.divider,
+              color: (theme) => theme.palette.text.primary,
+            }}
+          >
+            Filter
+          </Button>
+        </Box>
+
+        {/* Tabs Section */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+          <Tabs value={selectedTab} onChange={handleTabChange}>
+            <Tab label="Market Trends" />
+            <Tab label="Customer Behavior" />
+            <Tab label="Competitive Analysis" />
           </Tabs>
         </Box>
 
-        {/* Main Content */}
+        {/* Insights Grid */}
         <Grid container spacing={3}>
-          {getInsightsByCategory().map((insight) => (
-            <Grid item xs={12} md={6} lg={4} key={insight.id}>
-              <Card 
-                sx={{ 
-                  cursor: 'pointer',
-                  '&:hover': { transform: 'translateY(-4px)', transition: 'transform 0.2s' }
-                }}
-                onClick={() => handleInsightClick(insight)}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Chip
-                      label={insight.impact}
-                      color={insight.impact === 'High' ? 'error' : 'warning'}
-                      size="small"
-                    />
-                    <IconButton size="small">
-                      <FiMoreVertical />
-                    </IconButton>
-                  </Box>
-                  <Typography variant="h6" sx={{ mb: 1 }}>
-                    {insight.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {insight.description}
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {insight.trend === 'up' ? (
-                        <FiArrowUp color="var(--success)" />
-                      ) : (
-                        <FiArrowDown color="var(--error)" />
-                      )}
-                      <Typography variant="body2" color="text.secondary">
-                        {insight.confidence}% confidence
+          {getInsightsByCategory()
+            .filter((insight) =>
+              insight.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              insight.description.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((insight) => (
+              <Grid item xs={12} md={6} lg={4} key={insight.id}>
+                <Card
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': {
+                      boxShadow: (theme) => theme.shadows[4],
+                    },
+                  }}
+                  onClick={() => handleInsightClick(insight)}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {insight.title}
                       </Typography>
+                      <IconButton size="small">
+                        <FiMoreVertical />
+                      </IconButton>
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      {insight.date}
+
+                    <Typography variant="body2" sx={{ mb: 2, color: (theme) => theme.palette.text.secondary }}>
+                      {insight.description}
                     </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
+
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                      <Chip
+                        size="small"
+                        label={`Impact: ${insight.impact}`}
+                        sx={{ bgcolor: (theme) => theme.palette.action.hover }}
+                      />
+                      <Chip
+                        size="small"
+                        label={`${insight.confidence}% Confidence`}
+                        sx={{ bgcolor: (theme) => theme.palette.action.hover }}
+                      />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <FiCalendar size={14} />
+                      <Typography variant="caption" sx={{ color: (theme) => theme.palette.text.secondary }}>
+                        {new Date(insight.date).toLocaleDateString()}
+                      </Typography>
+                      {insight.trend === 'up' ? (
+                        <FiArrowUp color="green" />
+                      ) : (
+                        <FiArrowDown color="red" />
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
         </Grid>
 
         {/* Filter Menu */}
         <Menu
-          anchorEl={filterAnchorEl}
-          open={Boolean(filterAnchorEl)}
+          anchorEl={filterAnchor}
+          open={Boolean(filterAnchor)}
           onClose={handleFilterClose}
+          sx={{
+            '& .MuiPaper-root': {
+              bgcolor: (theme) => theme.palette.background.paper,
+              boxShadow: (theme) => theme.shadows[4],
+            },
+          }}
         >
-          <MenuItem onClick={handleFilterClose}>Last 7 days</MenuItem>
-          <MenuItem onClick={handleFilterClose}>Last 30 days</MenuItem>
-          <MenuItem onClick={handleFilterClose}>Last quarter</MenuItem>
-          <MenuItem onClick={handleFilterClose}>Custom range...</MenuItem>
+          <MenuItem onClick={handleFilterClose}>High Impact</MenuItem>
+          <MenuItem onClick={handleFilterClose}>Medium Impact</MenuItem>
+          <MenuItem onClick={handleFilterClose}>Low Impact</MenuItem>
+          <MenuItem onClick={handleFilterClose}>High Confidence</MenuItem>
+          <MenuItem onClick={handleFilterClose}>Recent First</MenuItem>
         </Menu>
-
-        {/* Chat Dialog */}
-        <Dialog open={chatOpen} onClose={() => setChatOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Ask AI Assistant</DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              fullWidth
-              placeholder="Ask about insights, trends, or recommendations..."
-              variant="outlined"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setChatOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={() => setChatOpen(false)}>
-              Send
-            </Button>
-          </DialogActions>
-        </Dialog>
 
         {/* Insight Detail Dialog */}
         <Dialog
@@ -276,52 +323,91 @@ const AIInsightsPage: React.FC = () => {
         >
           {selectedInsight && (
             <>
-              <DialogTitle>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  {selectedInsight.title}
-                  <Box>
-                    <Tooltip title="Export">
-                      <IconButton>
-                        <FiDownload />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Share">
-                      <IconButton>
-                        <FiShare2 />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </Box>
-              </DialogTitle>
+              <DialogTitle>{selectedInsight.title}</DialogTitle>
               <DialogContent>
                 <Typography variant="body1" paragraph>
                   {selectedInsight.description}
                 </Typography>
-                <Typography variant="h6" gutterBottom>
-                  Recommendations
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <Chip label={`Impact: ${selectedInsight.impact}`} />
+                  <Chip label={`${selectedInsight.confidence}% Confidence`} />
+                  <Chip label={selectedInsight.category} />
+                </Box>
+                <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary }}>
+                  Generated on {new Date(selectedInsight.date).toLocaleDateString()}
                 </Typography>
-                <Typography variant="body1" paragraph>
-                  Based on this insight, we recommend:
-                  {/* Add specific recommendations based on the insight */}
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<FiMessageSquare />}
-                  sx={{ mt: 2 }}
-                >
-                  Discuss with AI
-                </Button>
               </DialogContent>
               <DialogActions>
-                <Button onClick={() => setSelectedInsight(null)}>Close</Button>
-                <Button variant="contained" color="primary">
-                  Apply Recommendations
+                <Button startIcon={<FiShare2 />}>Share</Button>
+                <Button startIcon={<FiDownload />}>Download</Button>
+                <Button startIcon={<FiMessageSquare />}>Add Comment</Button>
+                <Button variant="contained" onClick={() => setSelectedInsight(null)}>
+                  Close
                 </Button>
               </DialogActions>
             </>
           )}
         </Dialog>
+
+        {/* Chat Interface */}
+        <Box sx={{ position: 'fixed', bottom: 24, right: 24, width: 400, height: 500, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 4, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6">AI Assistant</Typography>
+            <IconButton size="small">
+              <FiMessageSquare />
+            </IconButton>
+          </Box>
+          
+          <Box sx={{ flex: 1, p: 2, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {messages.map((message) => (
+              <Box
+                key={message.id}
+                sx={{
+                  alignSelf: message.sender === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '80%',
+                  bgcolor: message.sender === 'user' ? 'primary.main' : 'background.default',
+                  color: message.sender === 'user' ? 'primary.contrastText' : 'text.primary',
+                  p: 2,
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="body2">{message.text}</Typography>
+                <Typography variant="caption" sx={{ display: 'block', mt: 1, opacity: 0.7 }}>
+                  {message.timestamp.toLocaleTimeString()}
+                </Typography>
+              </Box>
+            ))}
+            {isLoading && (
+              <Box sx={{ alignSelf: 'flex-start', p: 2 }}>
+                <Typography variant="body2">Thinking...</Typography>
+              </Box>
+            )}
+          </Box>
+
+          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+            <TextField
+              fullWidth
+              placeholder="Ask me anything..."
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleSendMessage} disabled={isLoading || !inputMessage.trim()}>
+                      <FiMessageSquare />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+        </Box>
       </Container>
     </Box>
   );

@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import {
   Box,
   Card,
@@ -30,6 +33,7 @@ import {
   FiZap
 } from 'react-icons/fi';
 import { Message, MessageRole, MessageType } from '../../types/assistant';
+import { langflowService } from '../../services/langflowService';
 
 const AIAssistant: React.FC = () => {
   const theme = useTheme();
@@ -81,36 +85,44 @@ const AIAssistant: React.FC = () => {
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      type: 'text',
-      content: input.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsProcessing(true);
-
-    // Simulate AI response with more detailed content
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
+    try {
+      setIsProcessing(true);
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: input,
+        role: 'user',
         type: 'text',
-        content: "I understand your request. Here's a detailed response:\n\n1. First, let's analyze the key points...\n2. Based on best practices...\n3. Here's a code example:\n\n```typescript\nconst example = () => {\n  // Your code here\n};\n```\n\nLet me know if you need any clarification!",
-        timestamp: new Date().toISOString(),
-        metadata: {
-          confidence: 0.95,
-          executionTime: '0.8s',
-          model: 'GPT-4',
-        },
+        timestamp: new Date().toISOString()
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+
+      const response = await langflowService.sendMessage(input);
+      console.log('AI response:', response);
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response,
+        role: 'assistant',
+        type: 'text',
+        timestamp: new Date().toISOString()
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error: any) {
+      console.error('Error in chat:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: error.message || 'An unexpected error occurred',
+        role: 'assistant',
+        type: 'error',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -207,16 +219,140 @@ const AIAssistant: React.FC = () => {
                       )}
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          color: 'var(--text-primary)',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {message.content}
-                      </Typography>
+                      {message.role === 'user' ? (
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            color: 'var(--text-primary)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {message.content}
+                        </Typography>
+                      ) : (
+                        <Box sx={{
+                          '& .markdown-content': {
+                            color: 'var(--text-primary)',
+                            '& h1, & h2, & h3, & h4, & h5, & h6': {
+                              color: 'var(--text-primary)',
+                              marginTop: '16px',
+                              marginBottom: '8px',
+                              fontWeight: 600,
+                            },
+                            '& h1': { fontSize: '2em' },
+                            '& h2': { fontSize: '1.5em' },
+                            '& h3': { fontSize: '1.17em' },
+                            '& p': {
+                              marginBottom: '16px',
+                              lineHeight: 1.6,
+                              '& strong': {
+                                color: 'var(--primary-color)',
+                                fontWeight: 600,
+                              },
+                              '& em': {
+                                fontStyle: 'italic',
+                                color: 'var(--text-secondary)',
+                              },
+                            },
+                            '& ul, & ol': {
+                              marginLeft: '24px',
+                              marginBottom: '16px',
+                              '& li': {
+                                marginBottom: '8px',
+                                '& strong': {
+                                  color: 'var(--primary-color)',
+                                  fontWeight: 600,
+                                },
+                                '& em': {
+                                  fontStyle: 'italic',
+                                  color: 'var(--text-secondary)',
+                                },
+                                '&::marker': {
+                                  color: 'var(--primary-color)',
+                                },
+                              },
+                            },
+                            '& code': {
+                              backgroundColor: 'var(--background-primary)',
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              fontSize: '0.9em',
+                              color: 'var(--primary-color)',
+                              fontFamily: 'monospace',
+                            },
+                            '& pre': {
+                              backgroundColor: 'var(--background-primary)',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              overflow: 'auto',
+                              marginBottom: '16px',
+                              '& code': {
+                                backgroundColor: 'transparent',
+                                padding: 0,
+                                color: 'var(--text-primary)',
+                              },
+                            },
+                            '& blockquote': {
+                              borderLeft: '4px solid var(--primary-color)',
+                              paddingLeft: '16px',
+                              marginLeft: 0,
+                              marginBottom: '16px',
+                              color: 'var(--text-secondary)',
+                              fontStyle: 'italic',
+                            },
+                            '& hr': {
+                              border: 'none',
+                              borderTop: '2px solid var(--border-color)',
+                              margin: '24px 0',
+                            },
+                            '& a': {
+                              color: 'var(--primary-color)',
+                              textDecoration: 'none',
+                              '&:hover': {
+                                textDecoration: 'underline',
+                              },
+                            },
+                            '& table': {
+                              width: '100%',
+                              borderCollapse: 'collapse',
+                              marginBottom: '16px',
+                              '& th, & td': {
+                                border: '1px solid var(--border-color)',
+                                padding: '8px',
+                                textAlign: 'left',
+                              },
+                              '& th': {
+                                backgroundColor: 'var(--background-primary)',
+                                fontWeight: 600,
+                              },
+                            },
+                            '& br': {
+                              marginBottom: '8px',
+                            },
+                          },
+                        }}>
+                          <ReactMarkdown 
+                            className="markdown-content"
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                            components={{
+                              strong: ({node, ...props}) => (
+                                <strong style={{color: 'var(--primary-color)', fontWeight: 600}} {...props} />
+                              ),
+                              em: ({node, ...props}) => (
+                                <em style={{color: 'var(--text-secondary)', fontStyle: 'italic'}} {...props} />
+                              ),
+                              li: ({node, children, ...props}) => (
+                                <li style={{marginBottom: '8px'}} {...props}>
+                                  {children}
+                                </li>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </Box>
+                      )}
                       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                         {message.metadata?.confidence && (
                           <Chip
