@@ -151,10 +151,10 @@ const AIInsightsPage: React.FC = () => {
       const response = await chatService.sendMessage(currentMessage);
       console.log('Response from Langflow:', response);
 
-      if (response && response.message) {
+      if (response && response.content) {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: response.message,
+          text: response.content,
           sender: 'ai',
           timestamp: new Date(),
         };

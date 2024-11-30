@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -17,6 +17,8 @@ import {
   createTheme,
   CssBaseline,
   alpha,
+  CircularProgress,
+  Divider,
 } from '@mui/material';
 import {
   FiCommand,
@@ -27,7 +29,9 @@ import {
   FiCode,
   FiCpu,
 } from 'react-icons/fi';
-import { CopilotChat } from '../../components/CopilotChat/CopilotChat';
+import { Chat } from '../../components/ChatHistory/types';
+import { generateInsights } from '../../services/mistral';
+import { Insight, InsightsState } from '../../types/insights';
 
 // Create a custom theme for dark mode
 const darkTheme = createTheme({
@@ -40,8 +44,12 @@ const darkTheme = createTheme({
       main: '#10B981', // Green
     },
     background: {
-      default: '#111827',
-      paper: '#1F2937',
+      default: 'transparent',
+      paper: '#1A1A1A',
+    },
+    text: {
+      primary: '#FFFFFF',
+      secondary: 'rgba(255, 255, 255, 0.7)',
     },
   },
   typography: {
@@ -64,10 +72,11 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          backgroundColor: '#1A1A1A',
           transition: 'transform 0.2s, box-shadow 0.2s',
           '&:hover': {
             transform: 'translateY(-4px)',
-            boxShadow: '0 12px 24px rgba(0,0,0,0.2)',
+            boxShadow: '0 12px 24px rgba(0,0,0,0.4)',
           },
         },
       },
@@ -76,6 +85,16 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          backgroundColor: '#1A1A1A',
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          },
         },
       },
     },
@@ -164,25 +183,157 @@ const insights: InsightItem[] = [
   },
 ];
 
-export const AIHubPage: React.FC = () => {
+interface ChatData {
+  id: string;
+  title: string;
+  date: string;
+  userId: string;
+}
+
+export const AIHubPage = () => {
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [chats, setChats] = useState<ChatData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [insightsState, setInsights] = useState<InsightsState>({
+    items: [],
+    loading: false,
+    error: null,
+  });
+
+  const handleNewChat = () => {
+    const newChat: ChatData = {
+      id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: 'New Chat',
+      date: new Date().toISOString(),
+      userId: 'user123', // Replace with actual user ID
+    };
+    setChats(prev => [newChat, ...prev]);
+    setCurrentChatId(newChat.id);
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    setChats(prev => prev.filter(chat => chat.id !== chatId));
+    if (currentChatId === chatId) {
+      setCurrentChatId(null);
+    }
+  };
+
+  const handleSendMessage = async (message: string): Promise<string> => {
+    setIsLoading(true);
+    try {
+      const response = await generateInsights([message]);
+      return response[0] || 'I apologize, but I was unable to generate a response.';
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return 'I apologize, but an error occurred while processing your message.';
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetInsights = () => {
+    setInsights({
+      items: [],
+      loading: false,
+      error: null,
+    });
+  };
+
+  const generateNewInsights = async () => {
+    setInsights(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      // Get chat history from localStorage
+      const savedChats = localStorage.getItem('zaaz_chat_history');
+      if (!savedChats) {
+        throw new Error('No chat history found');
+      }
+
+      const chatHistory = JSON.parse(savedChats);
+      const messages = chatHistory.map((chat: any) => chat.title).filter(Boolean);
+
+      if (messages.length === 0) {
+        throw new Error('No chat messages found');
+      }
+
+      const newInsights = await generateInsights(messages);
+      
+      const formattedInsights: Insight[] = newInsights.map(content => ({
+        id: `insight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content,
+        timestamp: new Date().toISOString(),
+      }));
+
+      setInsights(prev => ({
+        items: [...formattedInsights, ...prev.items].slice(0, 10), // Keep only last 10 insights
+        loading: false,
+        error: null,
+      }));
+    } catch (error) {
+      setInsights(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to generate insights',
+      }));
+    }
+  };
+
+  // Generate insights periodically or when chat history changes
+  useEffect(() => {
+    resetInsights(); // Reset insights when component mounts
+    const intervalId = setInterval(generateNewInsights, 5 * 60 * 1000); // Every 5 minutes
+    generateNewInsights(); // Initial generation
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ minHeight: '100vh' }}>
         <Container maxWidth="xl" sx={{ py: 4 }}>
           <Typography variant="h4" gutterBottom sx={{ mb: 4, color: 'text.primary' }}>
             AI Hub
           </Typography>
           
           <Grid container spacing={4}>
-            {/* Left column - Tools and Insights */}
-            <Grid item xs={12} lg={8}>
-              {/* AI Tools Section */}
-              <Box sx={{ mb: 6 }}>
-                <Typography variant="h5" gutterBottom sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Chat Section - Centered with reduced width */}
+            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
+              <Box sx={{ width: '100%', maxWidth: '1000px' }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    height: '60vh',
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: 'transparent',
+                  }}
+                >
+                  <iframe
+                    src="https://app.vectorshift.ai/chatbots/deployed/674a0e19d7509779a7bda984"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                    }}
+                    title="Vectorshift Chat"
+                  />
+                </Paper>
+              </Box>
+            </Grid>
+
+            {/* AI Tools Section */}
+            <Grid item xs={12} md={6}>
+              <Box>
+                <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <FiTool style={{ strokeWidth: 2.5 }} />
-                  AI Tools
-                </Typography>
+                  <Typography variant="h6">
+                    AI Tools
+                  </Typography>
+                </Box>
                 <Grid container spacing={3}>
                   {tools.map((tool, index) => (
                     <Grid item xs={12} md={4} key={index}>
@@ -212,87 +363,59 @@ export const AIHubPage: React.FC = () => {
                   ))}
                 </Grid>
               </Box>
+            </Grid>
 
-              {/* AI Insights Section */}
+            {/* AI Insights Section */}
+            <Grid item xs={12} md={6}>
               <Box>
-                <Typography variant="h5" gutterBottom sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <FiZap style={{ strokeWidth: 2.5 }} />
-                  AI Insights
-                </Typography>
+                  <Typography variant="h6">
+                    AI Insights
+                  </Typography>
+                </Box>
                 <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
                   <List>
-                    {insights.map((insight, index) => (
-                      <ListItem 
-                        disablePadding 
-                        key={index}
-                        divider={index !== insights.length - 1}
-                      >
-                        <ListItemButton sx={{ py: 2 }}>
-                          <ListItemIcon>
-                            <StyledIcon icon={insight.icon} color={insight.color} />
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary={insight.title}
-                            secondary={insight.description}
-                            primaryTypographyProps={{ 
-                              fontWeight: 500,
-                              sx: { color: 'text.primary' }
-                            }}
-                            secondaryTypographyProps={{
-                              sx: { color: 'text.secondary' }
-                            }}
-                          />
-                          <Chip 
-                            label={insight.tag} 
-                            size="small"
-                            color={insight.color}
-                            sx={{ 
-                              ml: 2,
-                              borderRadius: '6px',
-                              fontWeight: 500,
-                            }}
-                          />
-                        </ListItemButton>
+                    {insightsState.loading ? (
+                      <ListItem>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', py: 2 }}>
+                          <CircularProgress size={24} />
+                        </Box>
                       </ListItem>
-                    ))}
+                    ) : insightsState.error ? (
+                      <ListItem>
+                        <ListItemText
+                          primary="Error generating insights"
+                          secondary={insightsState.error}
+                          sx={{ color: 'error.main' }}
+                        />
+                      </ListItem>
+                    ) : insightsState.items.length === 0 ? (
+                      <ListItem>
+                        <ListItemText
+                          primary="No insights yet"
+                          secondary="Start chatting to generate insights"
+                        />
+                      </ListItem>
+                    ) : (
+                      insightsState.items.map((insight, index) => (
+                        <React.Fragment key={insight.id}>
+                          <ListItem>
+                            <ListItemText
+                              primary={insight.content}
+                              secondary={new Date(insight.timestamp).toLocaleString()}
+                              primaryTypographyProps={{
+                                sx: { fontWeight: index === 0 ? 500 : 400 }
+                              }}
+                            />
+                          </ListItem>
+                          {index < insightsState.items.length - 1 && <Divider />}
+                        </React.Fragment>
+                      ))
+                    )}
                   </List>
                 </Paper>
               </Box>
-            </Grid>
-
-            {/* Right column - Chat */}
-            <Grid item xs={12} lg={4}>
-              <Paper
-                elevation={0}
-                sx={{
-                  height: 'calc(100vh - 140px)',
-                  position: 'sticky',
-                  top: 32,
-                  bgcolor: 'background.paper',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Box sx={{ 
-                  p: 2, 
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                }}>
-                  <FiCommand style={{ strokeWidth: 2.5 }} />
-                  <Typography variant="h6">
-                    Zaaz AI Assistant
-                  </Typography>
-                </Box>
-                <Box sx={{ height: 'calc(100% - 57px)' }}>
-                  <CopilotChat />
-                </Box>
-              </Paper>
             </Grid>
           </Grid>
         </Container>
